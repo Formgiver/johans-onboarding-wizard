@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { ArrowLeftIcon } from '@heroicons/react/24/outline'
+import { StatusBadge, WizardProgress } from '@/components/ui'
 import WizardInputsClient from './WizardInputsClient'
 // import WizardOutputsClient from './WizardOutputsClient'
 // import {
@@ -22,12 +24,21 @@ export default async function WizardInstancePage({
 
   if (!user) {
     return (
-      <div style={{ maxWidth: '900px', margin: '100px auto', padding: '20px' }}>
-        <h1>Wizard Instance</h1>
-        <p>You must be logged in to view this wizard.</p>
-        <Link href="/login" style={{ color: '#0070f3', textDecoration: 'underline' }}>
-          Go to login
-        </Link>
+      <div className="min-h-screen bg-gray-50 px-6 py-24 sm:py-32 lg:px-8">
+        <div className="mx-auto max-w-2xl text-center">
+          <h1 className="text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">Wizard Instance</h1>
+          <p className="mt-6 text-lg/8 text-gray-600">
+            You must be logged in to view this wizard.
+          </p>
+          <div className="mt-10">
+            <Link
+              href="/login"
+              className="rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+            >
+              Go to login
+            </Link>
+          </div>
+        </div>
       </div>
     )
   }
@@ -80,9 +91,13 @@ export default async function WizardInstancePage({
 
   if (!wizard) {
     return (
-      <div style={{ maxWidth: '900px', margin: '100px auto', padding: '20px' }}>
-        <h1>Error</h1>
-        <p>Wizard definition not found.</p>
+      <div className="min-h-screen bg-gray-50 px-6 py-24 sm:py-32 lg:px-8">
+        <div className="mx-auto max-w-2xl">
+          <h1 className="text-4xl font-semibold tracking-tight text-gray-900">Error</h1>
+          <div className="mt-6 rounded-md bg-red-50 p-4">
+            <p className="text-sm text-red-800">Wizard definition not found.</p>
+          </div>
+        </div>
       </div>
     )
   }
@@ -95,15 +110,24 @@ export default async function WizardInstancePage({
 
   if (!steps || steps.length === 0) {
     return (
-      <div style={{ maxWidth: '900px', margin: '100px auto', padding: '20px' }}>
-        <Link
-          href={`/projects/${projectId}/wizards`}
-          style={{ color: '#0070f3', textDecoration: 'underline' }}
-        >
-          ← Back to Wizards
-        </Link>
-        <h1 style={{ marginTop: '20px' }}>{wizard.name}</h1>
-        <p>No steps defined for this wizard.</p>
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-white shadow-sm">
+          <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+            <Link
+              href={`/projects/${projectId}/wizards`}
+              className="inline-flex items-center gap-x-1.5 text-sm font-semibold text-gray-900 hover:text-indigo-600"
+            >
+              <ArrowLeftIcon aria-hidden="true" className="size-4" />
+              Back to Wizards
+            </Link>
+          </div>
+        </div>
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <h1 className="text-3xl font-semibold tracking-tight text-gray-900">{wizard.name}</h1>
+          <div className="mt-6 rounded-md bg-yellow-50 p-4">
+            <p className="text-sm text-yellow-800">No steps defined for this wizard.</p>
+          </div>
+        </div>
       </div>
     )
   }
@@ -168,42 +192,62 @@ export default async function WizardInstancePage({
   // )
 
   return (
-    <div style={{ maxWidth: '900px', margin: '100px auto', padding: '20px' }}>
-      <Link
-        href={`/projects/${projectId}/wizards`}
-        style={{ color: '#0070f3', textDecoration: 'underline' }}
-      >
-        ← Back to Wizards
-      </Link>
-      <h1 style={{ marginTop: '20px' }}>{wizard.name}</h1>
-      {wizard.description && <p style={{ color: '#666' }}>{wizard.description}</p>}
-      <div style={{ marginTop: '12px', display: 'flex', gap: '20px', color: '#666' }}>
-        <p>
-          Status: <strong>{instance.status}</strong>
-        </p>
-        <p>
-          Progress: <strong>{instance.progress_percent || 0}%</strong> (
-          {instance.completed_steps_count || 0}/{instance.total_required_steps || 0}{' '}
-          steps)
-        </p>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm">
+        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+          <Link
+            href={`/projects/${projectId}/wizards`}
+            className="inline-flex items-center gap-x-1.5 text-sm font-semibold text-gray-900 hover:text-indigo-600"
+          >
+            <ArrowLeftIcon aria-hidden="true" className="size-4" />
+            Back to Wizards
+          </Link>
+        </div>
       </div>
 
-      <hr style={{ margin: '30px 0', border: 'none', borderTop: '1px solid #ccc' }} />
+      {/* Main Content */}
+      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Wizard Header */}
+        <div className="mb-8">
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight text-gray-900">{wizard.name}</h1>
+              {wizard.description && <p className="mt-2 text-base text-gray-600">{wizard.description}</p>}
+            </div>
+            <StatusBadge status={instance.status as any} />
+          </div>
 
-      <h2>Steps</h2>
-      <WizardInputsClient
-        wizardInstanceId={wizardInstanceId}
-        steps={stepsWithData}
-        projectCountry={project?.country || undefined}
-      />
+          {/* Progress Bar */}
+          <div className="mt-6">
+            <WizardProgress
+              completedSteps={instance.completed_steps_count || 0}
+              totalSteps={instance.total_required_steps || 0}
+              percentage={instance.progress_percent || 0}
+            />
+          </div>
+        </div>
 
-      {/* <hr style={{ margin: '30px 0', border: 'none', borderTop: '1px solid #ccc' }} />
+        {/* Steps Section */}
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold text-gray-900">Wizard Steps</h2>
+          <p className="mt-1 text-sm text-gray-600">Complete all required steps to finish the wizard.</p>
+        </div>
 
-      <h2>Outputs & Summaries</h2>
-      <WizardOutputsClient
-        customerSummary={customerSummary}
-        pmDraft={pmDraft}
-      /> */}
+        <WizardInputsClient
+          wizardInstanceId={wizardInstanceId}
+          steps={stepsWithData}
+          projectCountry={project?.country || undefined}
+        />
+
+        {/* <hr style={{ margin: '30px 0', border: 'none', borderTop: '1px solid #ccc' }} />
+
+        <h2>Outputs & Summaries</h2>
+        <WizardOutputsClient
+          customerSummary={customerSummary}
+          pmDraft={pmDraft}
+        /> */}
+      </div>
     </div>
   )
 }

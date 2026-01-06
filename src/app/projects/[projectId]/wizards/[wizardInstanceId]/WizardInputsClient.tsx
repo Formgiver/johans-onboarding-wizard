@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline'
+import { Button, Alert } from '@/components/ui'
 
 type StepInput = {
   step_id: string
@@ -97,13 +99,7 @@ export default function WizardInputsClient({
               setFormData((prev) => ({ ...prev, [step.step_id]: e.target.value }))
             }
             placeholder={(step.config.placeholder as string) || ''}
-            style={{
-              width: '100%',
-              padding: '8px',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              fontSize: '14px',
-            }}
+            className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
           />
         )
 
@@ -117,14 +113,7 @@ export default function WizardInputsClient({
             }
             placeholder={(step.config.placeholder as string) || ''}
             rows={(step.config.rows as number) || 4}
-            style={{
-              width: '100%',
-              padding: '8px',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              fontSize: '14px',
-              fontFamily: 'inherit',
-            }}
+            className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
           />
         )
 
@@ -137,13 +126,7 @@ export default function WizardInputsClient({
             onChange={(e) =>
               setFormData((prev) => ({ ...prev, [step.step_id]: e.target.value }))
             }
-            style={{
-              width: '100%',
-              padding: '8px',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              fontSize: '14px',
-            }}
+            className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
           >
             <option value="">-- Select --</option>
             {options.map((opt) => (
@@ -157,8 +140,8 @@ export default function WizardInputsClient({
 
       case 'checkbox':
         return (
-          <div>
-            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+          <div className="relative flex items-start">
+            <div className="flex h-6 items-center">
               <input
                 type="checkbox"
                 id={`input-${step.step_id}`}
@@ -166,10 +149,14 @@ export default function WizardInputsClient({
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, [step.step_id]: e.target.checked }))
                 }
-                style={{ marginRight: '8px' }}
+                className="size-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600"
               />
-              <span>{(step.config.label as string) || 'Confirm'}</span>
-            </label>
+            </div>
+            <div className="ml-3 text-sm/6">
+              <label htmlFor={`input-${step.step_id}`} className="font-medium text-gray-900 cursor-pointer">
+                {(step.config.label as string) || 'Confirm'}
+              </label>
+            </div>
           </div>
         )
 
@@ -183,13 +170,7 @@ export default function WizardInputsClient({
               setFormData((prev) => ({ ...prev, [step.step_id]: e.target.value }))
             }
             placeholder={(step.config.placeholder as string) || ''}
-            style={{
-              width: '100%',
-              padding: '8px',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              fontSize: '14px',
-            }}
+            className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
           />
         )
 
@@ -199,16 +180,7 @@ export default function WizardInputsClient({
             id={`input-${step.step_id}`}
             value={JSON.stringify(step.existing_data, null, 2)}
             readOnly
-            style={{
-              width: '100%',
-              minHeight: '80px',
-              fontFamily: 'monospace',
-              fontSize: '12px',
-              padding: '8px',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              backgroundColor: '#f5f5f5',
-            }}
+            className="block w-full rounded-md bg-gray-50 px-3 py-1.5 text-xs font-mono text-gray-900 outline-1 -outline-offset-1 outline-gray-300 min-h-20"
           />
         )
     }
@@ -227,52 +199,67 @@ export default function WizardInputsClient({
         return (
           <div
             key={step.step_id}
-            style={{
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              padding: '20px',
-              marginBottom: '20px',
-            }}
+            className="rounded-lg bg-white shadow-sm inset-ring inset-ring-gray-200 p-6 mb-6"
           >
-            <h3 style={{ margin: '0 0 8px 0' }}>
-              {step.position}. {step.title}
-              {step.is_required && <span style={{ color: 'red' }}> *</span>}
-            </h3>
-            {step.description && (
-              <p style={{ color: '#666', fontSize: '14px' }}>{step.description}</p>
-            )}
-
-            <div style={{ marginTop: '12px' }}>
-              {renderStepInput(step)}
+            <div className="mb-4">
+              <h3 className="text-base font-semibold text-gray-900">
+                {step.position}. {step.title}
+                {step.is_required && <span className="text-red-600"> *</span>}
+              </h3>
+              {step.description && (
+                <p className="mt-1 text-sm text-gray-600">{step.description}</p>
+              )}
             </div>
 
-            <button
-              onClick={() => handleSave(step.step_id)}
-              disabled={saving[step.step_id]}
-              style={{
-                marginTop: '12px',
-                padding: '8px 16px',
-                backgroundColor: saving[step.step_id] ? '#ccc' : '#0070f3',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: saving[step.step_id] ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {saving[step.step_id] ? 'Saving...' : 'Save'}
-            </button>
+            <div className="space-y-4">
+              <div>
+                <label htmlFor={`input-${step.step_id}`} className="block text-sm font-medium text-gray-900 mb-2">
+                  {step.step_type === 'checkbox' ? '' : 'Your answer'}
+                </label>
+                {renderStepInput(step)}
+              </div>
 
-            {messages[step.step_id] && (
-              <p
-                style={{
-                  marginTop: '8px',
-                  color: messages[step.step_id].type === 'success' ? 'green' : 'red',
-                  fontSize: '14px',
-                }}
-              >
-                {messages[step.step_id].text}
-              </p>
-            )}
+              <div className="flex items-center gap-x-4">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => handleSave(step.step_id)}
+                  disabled={saving[step.step_id]}
+                >
+                  {saving[step.step_id] ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 size-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Saving...
+                    </>
+                  ) : (
+                    'Save'
+                  )}
+                </Button>
+
+                {messages[step.step_id] && (
+                  <div className="flex items-center gap-x-2">
+                    {messages[step.step_id].type === 'success' ? (
+                      <>
+                        <CheckCircleIcon className="size-5 text-green-600" />
+                        <span className="text-sm font-medium text-green-600">
+                          {messages[step.step_id].text}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircleIcon className="size-5 text-red-600" />
+                        <span className="text-sm font-medium text-red-600">
+                          {messages[step.step_id].text}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )
       })}
