@@ -30,7 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files (local env files must not be committed)
+# Allow explicit committed envs only if intentionally added to the repo
+.env.local
 .env*
 
 # vercel
