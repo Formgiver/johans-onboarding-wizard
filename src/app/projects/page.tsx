@@ -36,7 +36,10 @@ export default async function ProjectsPage() {
 
   return (
     <div style={{ maxWidth: '800px', margin: '100px auto', padding: '20px' }}>
-      <h1>My Projects</h1>
+      <Link href="/" style={{ color: '#0070f3', textDecoration: 'underline' }}>
+        ← Back to Home
+      </Link>
+      <h1 style={{ marginTop: '20px' }}>My Projects</h1>
       <p>Logged in as: {user.email}</p>
       {projects && projects.length > 0 ? (
         <ul style={{ listStyle: 'none', padding: 0 }}>
@@ -57,6 +60,21 @@ export default async function ProjectsPage() {
               <p style={{ margin: '4px 0', color: '#666', fontSize: '14px' }}>
                 Created: {new Date(project.created_at).toLocaleDateString()}
               </p>
+              <Link
+                href={`/projects/${project.id}/wizards`}
+                style={{
+                  display: 'inline-block',
+                  marginTop: '12px',
+                  padding: '8px 16px',
+                  backgroundColor: '#0070f3',
+                  color: 'white',
+                  textDecoration: 'none',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                }}
+              >
+                View Wizards →
+              </Link>
             </li>
           ))}
         </ul>
