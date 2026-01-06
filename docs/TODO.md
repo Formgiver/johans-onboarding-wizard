@@ -20,6 +20,9 @@
 
 - [x] Wizard engine – data model (wizards, wizard_steps, wizard_instances, wizard_step_inputs)
 - [x] Wizard UI (Step F) – project detail, wizard instances list, wizard instance detail with editable inputs
+- [x] Structured step types (text, textarea, select, checkbox, country_specific) with config support
+- [x] Automatic progress tracking (progress_percent, completed_steps_count) via database trigger
+- [x] Customer summary and PM/Zendesk draft output generation
 - [ ] Author minimal interpreter spec for `WizardDefinition` (steps, conditions, validations).
 - [ ] Define process for authoring and reviewing wizard data (who may edit definitions).
 - [ ] Create test fixtures for common wizard flows and country profiles.
@@ -27,6 +30,8 @@
 ## Handover
 
 - [x] Sales handover – data model (sales_handovers, sales_handover_items, sales_handover_wizard_map)
+- [x] Automatic wizard activation when sales_handover status = CONFIRMED (via API route)
+- [x] Idempotent wizard instance creation based on sales items and wizard map
 - [ ] Draft handover artifact checklist for Sales → Project Managers.
 - [ ] Define export formats for completed wizard instances (PDF, CSV, JSON).
 - [ ] Specify access controls for archived handovers and support lookups.

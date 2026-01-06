@@ -2,6 +2,11 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import WizardInputsClient from './WizardInputsClient'
+// import WizardOutputsClient from './WizardOutputsClient'
+// import {
+//   generateCustomerSummary,
+//   generatePMZendeskDraft,
+// } from '@/lib/wizard-outputs'
 
 export default async function WizardInstancePage({
   params,
@@ -33,10 +38,23 @@ export default async function WizardInstancePage({
       id,
       status,
       wizard_id,
+      progress_percent,
+      completed_steps_count,
+      total_required_steps,
+      project_id,
       wizards (
         id,
         name,
         description
+      ),
+      projects (
+        id,
+        name,
+        country,
+        organizations (
+          id,
+          name
+        )
       )
     `)
     .eq('id', wizardInstanceId)
@@ -51,6 +69,15 @@ export default async function WizardInstancePage({
     ? null
     : (instance.wizards as { id: string; name: string; description: string | null } | null)
 
+  const project = Array.isArray(instance.projects)
+    ? null
+    : (instance.projects as {
+        id: string
+        name: string
+        country: string | null
+        organizations: { id: string; name: string } | null
+      } | null)
+
   if (!wizard) {
     return (
       <div style={{ maxWidth: '900px', margin: '100px auto', padding: '20px' }}>
@@ -62,7 +89,7 @@ export default async function WizardInstancePage({
 
   const { data: steps } = await supabase
     .from('wizard_steps')
-    .select('id, step_key, title, description, position, is_required')
+    .select('id, step_key, title, description, position, is_required, step_type, config')
     .eq('wizard_id', wizard.id)
     .order('position', { ascending: true })
 
@@ -102,6 +129,8 @@ export default async function WizardInstancePage({
       description: string | null
       position: number
       is_required: boolean
+      step_type: string
+      config: Record<string, unknown>
     }) => ({
       step_id: step.id,
       step_key: step.step_key,
@@ -109,9 +138,34 @@ export default async function WizardInstancePage({
       description: step.description,
       position: step.position,
       is_required: step.is_required,
+      step_type: step.step_type as 'text' | 'textarea' | 'select' | 'checkbox' | 'country_specific',
+      config: step.config || {},
       existing_data: inputsMap[step.id] || {},
     })
   )
+
+  // Prepare data for output generation
+  // const stepsForOutput = steps.map((step) => ({
+  //   step_key: step.step_key,
+  //   title: step.title,
+  //   description: step.description,
+  //   step_type: step.step_type,
+  //   position: step.position,
+  //   is_required: step.is_required,
+  //   input_value: (inputsMap[step.id]?.value as unknown) || null,
+  // }))
+
+  // const customerSummary = generateCustomerSummary(wizard.name, stepsForOutput)
+  // const pmDraft = generatePMZendeskDraft(
+  //   wizard.name,
+  //   project?.name || 'Unknown Project',
+  //   project?.organizations
+  //     ? Array.isArray(project.organizations)
+  //       ? 'Unknown Organization'
+  //       : project.organizations.name
+  //     : 'Unknown Organization',
+  //   stepsForOutput
+  // )
 
   return (
     <div style={{ maxWidth: '900px', margin: '100px auto', padding: '20px' }}>
@@ -123,9 +177,16 @@ export default async function WizardInstancePage({
       </Link>
       <h1 style={{ marginTop: '20px' }}>{wizard.name}</h1>
       {wizard.description && <p style={{ color: '#666' }}>{wizard.description}</p>}
-      <p style={{ marginTop: '12px', color: '#666' }}>
-        Status: <strong>{instance.status}</strong>
-      </p>
+      <div style={{ marginTop: '12px', display: 'flex', gap: '20px', color: '#666' }}>
+        <p>
+          Status: <strong>{instance.status}</strong>
+        </p>
+        <p>
+          Progress: <strong>{instance.progress_percent || 0}%</strong> (
+          {instance.completed_steps_count || 0}/{instance.total_required_steps || 0}{' '}
+          steps)
+        </p>
+      </div>
 
       <hr style={{ margin: '30px 0', border: 'none', borderTop: '1px solid #ccc' }} />
 
@@ -133,7 +194,16 @@ export default async function WizardInstancePage({
       <WizardInputsClient
         wizardInstanceId={wizardInstanceId}
         steps={stepsWithData}
+        projectCountry={project?.country || undefined}
       />
+
+      {/* <hr style={{ margin: '30px 0', border: 'none', borderTop: '1px solid #ccc' }} />
+
+      <h2>Outputs & Summaries</h2>
+      <WizardOutputsClient
+        customerSummary={customerSummary}
+        pmDraft={pmDraft}
+      /> */}
     </div>
   )
 }

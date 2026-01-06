@@ -10,22 +10,31 @@ type StepInput = {
   position: number
   is_required: boolean
   existing_data: Record<string, unknown>
+  step_type: 'text' | 'textarea' | 'select' | 'checkbox' | 'country_specific'
+  config: Record<string, unknown>
 }
 
 type WizardInputsClientProps = {
   wizardInstanceId: string
   steps: StepInput[]
+  projectCountry?: string
 }
 
 export default function WizardInputsClient({
   wizardInstanceId,
   steps,
+  projectCountry,
 }: WizardInputsClientProps) {
-  const [stepData, setStepData] = useState<Record<string, string>>(
+  const [formData, setFormData] = useState<Record<string, unknown>>(
     steps.reduce((acc, step) => {
-      acc[step.step_id] = JSON.stringify(step.existing_data, null, 2)
+      const existingValue = step.existing_data.value
+      if (step.step_type === 'checkbox') {
+        acc[step.step_id] = existingValue === true
+      } else {
+        acc[step.step_id] = existingValue || ''
+      }
       return acc
-    }, {} as Record<string, string>)
+    }, {} as Record<string, unknown>)
   )
 
   const [saving, setSaving] = useState<Record<string, boolean>>({})
@@ -39,26 +48,16 @@ export default function WizardInputsClient({
       return copy
     })
 
-    let parsedData: Record<string, unknown>
     try {
-      parsedData = JSON.parse(stepData[stepId] || '{}')
-    } catch {
-      setMessages((prev) => ({
-        ...prev,
-        [stepId]: { type: 'error', text: 'Invalid JSON format' },
-      }))
-      setSaving((prev) => ({ ...prev, [stepId]: false }))
-      return
-    }
+      const dataToSave = { value: formData[stepId] }
 
-    try {
       const response = await fetch('/api/wizard-inputs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           wizard_instance_id: wizardInstanceId,
           wizard_step_id: stepId,
-          data: parsedData,
+          data: dataToSave,
         }),
       })
 
@@ -84,74 +83,199 @@ export default function WizardInputsClient({
     }
   }
 
-  return (
-    <div>
-      {steps.map((step) => (
-        <div
-          key={step.step_id}
-          style={{
-            border: '1px solid #ccc',
-            borderRadius: '4px',
-            padding: '20px',
-            marginBottom: '20px',
-          }}
-        >
-          <h3 style={{ margin: '0 0 8px 0' }}>
-            {step.position}. {step.title}
-            {step.is_required && <span style={{ color: 'red' }}> *</span>}
-          </h3>
-          {step.description && <p style={{ color: '#666', fontSize: '14px' }}>{step.description}</p>}
+  const renderStepInput = (step: StepInput) => {
+    const value = formData[step.step_id]
 
-          <label htmlFor={`input-${step.step_id}`} style={{ display: 'block', marginTop: '12px', fontWeight: 'bold' }}>
-            Input Data (JSON):
-          </label>
-          <textarea
+    switch (step.step_type) {
+      case 'text':
+        return (
+          <input
+            type="text"
             id={`input-${step.step_id}`}
-            value={stepData[step.step_id] || '{}'}
+            value={(value as string) || ''}
             onChange={(e) =>
-              setStepData((prev) => ({ ...prev, [step.step_id]: e.target.value }))
+              setFormData((prev) => ({ ...prev, [step.step_id]: e.target.value }))
             }
+            placeholder={(step.config.placeholder as string) || ''}
             style={{
               width: '100%',
-              minHeight: '120px',
-              fontFamily: 'monospace',
-              fontSize: '14px',
               padding: '8px',
               border: '1px solid #ccc',
               borderRadius: '4px',
-              marginTop: '8px',
+              fontSize: '14px',
             }}
           />
+        )
 
-          <button
-            onClick={() => handleSave(step.step_id)}
-            disabled={saving[step.step_id]}
+      case 'textarea':
+        return (
+          <textarea
+            id={`input-${step.step_id}`}
+            value={(value as string) || ''}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, [step.step_id]: e.target.value }))
+            }
+            placeholder={(step.config.placeholder as string) || ''}
+            rows={(step.config.rows as number) || 4}
             style={{
-              marginTop: '12px',
-              padding: '8px 16px',
-              backgroundColor: saving[step.step_id] ? '#ccc' : '#0070f3',
-              color: 'white',
-              border: 'none',
+              width: '100%',
+              padding: '8px',
+              border: '1px solid #ccc',
               borderRadius: '4px',
-              cursor: saving[step.step_id] ? 'not-allowed' : 'pointer',
+              fontSize: '14px',
+              fontFamily: 'inherit',
+            }}
+          />
+        )
+
+      case 'select': {
+        const options = (step.config.options as Array<{ value: string; label: string }>) || []
+        return (
+          <select
+            id={`input-${step.step_id}`}
+            value={(value as string) || ''}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, [step.step_id]: e.target.value }))
+            }
+            style={{
+              width: '100%',
+              padding: '8px',
+              border: '1px solid #ccc',
+              borderRadius: '4px',
+              fontSize: '14px',
             }}
           >
-            {saving[step.step_id] ? 'Saving...' : 'Save'}
-          </button>
+            <option value="">-- Select --</option>
+            {options.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        )
+      }
 
-          {messages[step.step_id] && (
-            <p
+      case 'checkbox':
+        return (
+          <div>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                id={`input-${step.step_id}`}
+                checked={(value as boolean) || false}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, [step.step_id]: e.target.checked }))
+                }
+                style={{ marginRight: '8px' }}
+              />
+              <span>{(step.config.label as string) || 'Confirm'}</span>
+            </label>
+          </div>
+        )
+
+      case 'country_specific':
+        return (
+          <input
+            type="text"
+            id={`input-${step.step_id}`}
+            value={(value as string) || ''}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, [step.step_id]: e.target.value }))
+            }
+            placeholder={(step.config.placeholder as string) || ''}
+            style={{
+              width: '100%',
+              padding: '8px',
+              border: '1px solid #ccc',
+              borderRadius: '4px',
+              fontSize: '14px',
+            }}
+          />
+        )
+
+      default:
+        return (
+          <textarea
+            id={`input-${step.step_id}`}
+            value={JSON.stringify(step.existing_data, null, 2)}
+            readOnly
+            style={{
+              width: '100%',
+              minHeight: '80px',
+              fontFamily: 'monospace',
+              fontSize: '12px',
+              padding: '8px',
+              border: '1px solid #ccc',
+              borderRadius: '4px',
+              backgroundColor: '#f5f5f5',
+            }}
+          />
+        )
+    }
+  }
+
+  return (
+    <div>
+      {steps.map((step) => {
+        if (step.step_type === 'country_specific') {
+          const allowedCountries = (step.config.countries as string[]) || []
+          if (projectCountry && !allowedCountries.includes(projectCountry)) {
+            return null
+          }
+        }
+
+        return (
+          <div
+            key={step.step_id}
+            style={{
+              border: '1px solid #ccc',
+              borderRadius: '4px',
+              padding: '20px',
+              marginBottom: '20px',
+            }}
+          >
+            <h3 style={{ margin: '0 0 8px 0' }}>
+              {step.position}. {step.title}
+              {step.is_required && <span style={{ color: 'red' }}> *</span>}
+            </h3>
+            {step.description && (
+              <p style={{ color: '#666', fontSize: '14px' }}>{step.description}</p>
+            )}
+
+            <div style={{ marginTop: '12px' }}>
+              {renderStepInput(step)}
+            </div>
+
+            <button
+              onClick={() => handleSave(step.step_id)}
+              disabled={saving[step.step_id]}
               style={{
-                marginTop: '8px',
-                color: messages[step.step_id].type === 'success' ? 'green' : 'red',
-                fontSize: '14px',
+                marginTop: '12px',
+                padding: '8px 16px',
+                backgroundColor: saving[step.step_id] ? '#ccc' : '#0070f3',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: saving[step.step_id] ? 'not-allowed' : 'pointer',
               }}
             >
-              {messages[step.step_id].text}
-            </p>
-          )}
-        </div>
-      ))}
+              {saving[step.step_id] ? 'Saving...' : 'Save'}
+            </button>
+
+            {messages[step.step_id] && (
+              <p
+                style={{
+                  marginTop: '8px',
+                  color: messages[step.step_id].type === 'success' ? 'green' : 'red',
+                  fontSize: '14px',
+                }}
+              >
+                {messages[step.step_id].text}
+              </p>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

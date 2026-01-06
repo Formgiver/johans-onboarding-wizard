@@ -12,18 +12,40 @@ This document captures the canonical domain entities, their meanings, and the pr
 
 - WizardDefinition
   - A reusable, versioned definition that describes a wizard: steps, questions, validation rules, conditional logic, and localized content keys.
+  - Each step now has a `step_type` (text, textarea, select, checkbox, country_specific) and optional `config` for type-specific settings.
 
 - WizardInstance
   - A runtime instance of a `WizardDefinition` created for a specific `Project`. Stores answers, progress, and state transitions.
+  - Tracks progress automatically: `progress_percent`, `completed_steps_count`, `total_required_steps`.
+  - Status includes: DRAFT, ACTIVE, WAITING_ON_CUSTOMER, COMPLETED, ARCHIVED.
 
 - Step
   - A logical unit within a wizard (e.g., "Customer Info", "Integration Setup"). Steps can be linear or conditional.
+  - Now supports structured input types beyond free-form JSON.
+
+- StepType (NEW)
+  - Enumeration of supported input types:
+    - `text`: Single-line text input
+    - `textarea`: Multi-line text input
+    - `select`: Dropdown selection from predefined options
+    - `checkbox`: Boolean yes/no confirmation
+    - `country_specific`: Conditional field shown only for specific countries
 
 - Question (Field)
   - An atomic data capture element inside a step (type, label key, validation rules, optional/required, allowed answers).
 
 - Answer (Response)
   - A stored response to a `Question` on a specific `WizardInstance`. Includes metadata (who submitted, when).
+
+- SalesHandover (NEW)
+  - A structured handover snapshot from Sales to PM, containing items sold and triggering wizard activation.
+  - Status: DRAFT, CONFIRMED, ARCHIVED.
+
+- SalesHandoverItem (NEW)
+  - Individual key-value pairs representing sales selections (e.g., acquirer=elavon).
+
+- SalesHandoverWizardMap (NEW)
+  - Declarative mapping between sales selections and wizards to activate.
 
 - User
   - A human actor with a role and membership to one or more `Organization`s.
@@ -44,15 +66,19 @@ This document captures the canonical domain entities, their meanings, and the pr
 
 1. Organization onboarding: create `Organization`, configure `CountryProfile` and tenant settings.
 2. Project creation: `OrgAdmin` or `Sales` creates a `Project` to represent an onboarding engagement.
-3. Wizard selection or creation: choose or author a `WizardDefinition` relevant to the project scope.
-4. WizardInstance creation: instantiate the definition for the `Project`, set initial assignees and timelines.
-5. Execution: `CustomerUser`s and internal users complete `Steps`, submit `Answers`, and progress the instance.
-6. Verification & Handover: `ProjectManager` validates completed work, compiles handover artifacts, and marks the instance as complete.
-7. Support & Maintenance: `Support` may reopen or reference the completed instance for ongoing operations.
-8. Archive: completed projects and instances are archived according to retention policies.
+3. Sales handover: `Sales` creates a `SalesHandover`, adds items (acquirer, payment gateway, etc.), and confirms it.
+4. Automatic wizard activation: When handover is confirmed, system creates `WizardInstance`s based on `SalesHandoverWizardMap`.
+5. Wizard execution: `CustomerUser`s and internal users complete structured `Steps`, submit `Answers`, and progress updates automatically.
+6. Progress tracking: System calculates completion percentage and updates status (DRAFT → ACTIVE → COMPLETED).
+7. Output generation: System generates Customer Summary and PM/Zendesk Draft from wizard inputs (derived, not persisted).
+8. Verification & Handover: `ProjectManager` validates completed work, uses generated summaries for handover.
+9. Support & Maintenance: `Support` may reopen or reference the completed instance for ongoing operations.
+10. Archive: completed projects and instances are archived according to retention policies.
 
 ## Notes
 
 - Versioning: `WizardDefinition`s are versioned so past `WizardInstance`s remain stable and auditable.
 - Immutability: `AuditEvent`s should capture changes so that intent and rationale are traceable.
 - Country and tenant overrides: `WizardDefinition`s can reference `CountryProfile` and `Organization`-level overrides to support localization and legal differences.
+- Automatic progress: Progress is calculated automatically via database trigger when step inputs are saved.
+- Output summaries: Customer and PM summaries are generated on-demand from wizard data, not stored separately.
