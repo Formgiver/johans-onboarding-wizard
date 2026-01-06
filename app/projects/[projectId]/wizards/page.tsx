@@ -1,8 +1,47 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
-import { ArrowLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline'
-import { StatusBadge } from '@/components/ui'
+import { redirect, notFound } from 'next/navigation'
+import { 
+  ChevronRightIcon,
+  ClipboardDocumentListIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  ExclamationTriangleIcon,
+} from '@heroicons/react/24/outline'
+import { AppShell } from '@/components/layout'
+import { StatusBadge, ProgressRing, EmptyState } from '@/components/ui'
+import type { WizardStatus } from '@/components/ui'
+
+/**
+ * Wizards List Page
+ * 
+ * Design principles:
+ * - Wizards grouped by status (blocked first, then in-progress, then pending, then completed)
+ * - Progress visible at a glance
+ * - Clear indication of customer vs internal responsibility
+ */
+
+type WizardInstance = {
+  id: string
+  status: string
+  progress_percentage: number | null
+  started_at: string | null
+  completed_at: string | null
+  created_at: string
+  wizards: {
+    id: string
+    name: string
+    description: string | null
+  } | null
+}
+
+// Status priority for sorting (blocked first, completed last)
+const statusPriority: Record<string, number> = {
+  blocked: 0,
+  in_progress: 1,
+  not_started: 2,
+  completed: 3,
+}
 
 export default async function WizardsPage({
   params,
@@ -17,26 +56,10 @@ export default async function WizardsPage({
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return (
-      <div className="min-h-screen bg-gray-50 px-6 py-24 sm:py-32 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <h1 className="text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">Wizards</h1>
-          <p className="mt-6 text-lg/8 text-gray-600">
-            You must be logged in to view wizards.
-          </p>
-          <div className="mt-10">
-            <Link
-              href="/login"
-              className="rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-            >
-              Go to login
-            </Link>
-          </div>
-        </div>
-      </div>
-    )
+    redirect('/login')
   }
 
+  // Fetch project
   const { data: project } = await supabase
     .from('projects')
     .select('id, name')
@@ -47,14 +70,16 @@ export default async function WizardsPage({
     notFound()
   }
 
+  // Fetch wizard instances
   const { data: instances, error } = await supabase
     .from('wizard_instances')
     .select(`
       id,
       status,
-      activated_at,
+      progress_percentage,
+      started_at,
+      completed_at,
       created_at,
-      progress_percent,
       wizards (
         id,
         name,
@@ -66,109 +91,177 @@ export default async function WizardsPage({
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 px-6 py-24 sm:py-32 lg:px-8">
-        <div className="mx-auto max-w-2xl">
-          <h1 className="text-4xl font-semibold tracking-tight text-gray-900">Wizards</h1>
-          <div className="mt-6 rounded-md bg-red-50 p-4">
-            <p className="text-sm text-red-800">Error loading wizards: {error.message}</p>
-          </div>
+      <AppShell
+        user={{ email: user.email ?? '' }}
+        breadcrumbs={[
+          { name: 'Projects', href: '/projects' },
+          { name: project.name, href: `/projects/${projectId}` },
+          { name: 'Wizards' },
+        ]}
+      >
+        <div className="rounded-lg bg-red-50 p-4">
+          <p className="text-sm text-red-800">Error loading wizards: {error.message}</p>
         </div>
-      </div>
+      </AppShell>
     )
   }
 
+  // Transform and sort instances
+  const rawInstances = instances ?? []
+  const transformedInstances: WizardInstance[] = rawInstances.map((w: Record<string, unknown>) => ({
+    id: w.id as string,
+    status: w.status as string,
+    progress_percentage: w.progress_percentage as number | null,
+    started_at: w.started_at as string | null,
+    completed_at: w.completed_at as string | null,
+    created_at: w.created_at as string,
+    wizards: Array.isArray(w.wizards) ? w.wizards[0] : w.wizards as WizardInstance['wizards'],
+  }))
+
+  // Sort by status priority
+  const sortedInstances = [...transformedInstances].sort((a, b) => {
+    const priorityA = statusPriority[a.status] ?? 99
+    const priorityB = statusPriority[b.status] ?? 99
+    return priorityA - priorityB
+  })
+
+  // Group by status
+  const groupedWizards = {
+    attention: sortedInstances.filter(w => w.status === 'blocked' || w.status === 'in_progress'),
+    pending: sortedInstances.filter(w => w.status === 'not_started'),
+    completed: sortedInstances.filter(w => w.status === 'completed'),
+  }
+
+  // Calculate overall stats
+  const totalWizards = sortedInstances.length
+  const completedCount = groupedWizards.completed.length
+  const overallProgress = totalWizards > 0
+    ? Math.round(sortedInstances.reduce((sum, w) => sum + (w.progress_percentage ?? 0), 0) / totalWizards)
+    : 0
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-          <Link
-            href="/projects"
-            className="inline-flex items-center gap-x-1.5 text-sm font-semibold text-gray-900 hover:text-indigo-600"
-          >
-            <ArrowLeftIcon aria-hidden="true" className="size-4" />
-            Back to Projects
-          </Link>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Page Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
-            Wizards for {project.name}
-          </h1>
-          <p className="mt-2 text-sm text-gray-600">
-            Manage and track all wizard instances for this project.
-          </p>
-        </div>
-
-        {/* Wizards List */}
-        {instances && instances.length > 0 ? (
-          <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {instances.map((instance: { id: string; status: string; created_at: string; progress_percent: number | null; wizards: unknown }) => {
-              const wizard = instance.wizards as { id: string; name: string; description: string | null } | null
-              return (
-                <li
-                  key={instance.id}
-                  className="col-span-1 divide-y divide-gray-200 rounded-lg bg-white shadow-sm inset-ring inset-ring-gray-200"
-                >
-                  <div className="flex w-full items-center justify-between gap-x-6 p-6">
-                    <div className="min-w-0 flex-1">
-                      <h2 className="text-lg font-semibold text-gray-900 truncate">
-                        {wizard?.name || 'Unknown Wizard'}
-                      </h2>
-                      {wizard?.description && (
-                        <p className="mt-1 text-sm text-gray-500 line-clamp-2">{wizard.description}</p>
-                      )}
-                      <div className="mt-3 flex items-center gap-x-2">
-                        <StatusBadge status={instance.status as any} />
-                        {instance.progress_percent !== null && instance.progress_percent !== undefined && (
-                          <span className="text-xs text-gray-500">
-                            {instance.progress_percent}% complete
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-2 text-xs text-gray-500">
-                        Created {new Date(instance.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="px-6 py-4">
-                    <Link
-                      href={`/projects/${projectId}/wizards/${instance.id}`}
-                      className="inline-flex items-center gap-x-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-500"
-                    >
-                      View Details
-                      <ChevronRightIcon aria-hidden="true" className="size-4" />
-                    </Link>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        ) : (
-          <div className="text-center rounded-lg bg-white px-6 py-12 shadow-sm inset-ring inset-ring-gray-200">
-            <svg
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-              className="mx-auto size-12 text-gray-400"
-            >
-              <path
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-              />
-            </svg>
-            <h3 className="mt-2 text-sm font-semibold text-gray-900">No wizards</h3>
-            <p className="mt-1 text-sm text-gray-500">No wizard instances found for this project.</p>
+    <AppShell
+      user={{ email: user.email ?? '' }}
+      breadcrumbs={[
+        { name: 'Projects', href: '/projects' },
+        { name: project.name, href: `/projects/${projectId}` },
+        { name: 'Wizards' },
+      ]}
+    >
+      {/* Page Header */}
+      <div className="mb-8">
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Onboarding Wizards</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              {project.name} &middot; {completedCount} of {totalWizards} completed
+            </p>
           </div>
-        )}
+          <ProgressRing progress={overallProgress} size="md" />
+        </div>
       </div>
-    </div>
+
+      {/* Wizards content */}
+      {sortedInstances.length > 0 ? (
+        <div className="space-y-8">
+          {/* Needs Attention Section */}
+          {groupedWizards.attention.length > 0 && (
+            <section>
+              <h2 className="mb-3 flex items-center gap-x-2 text-sm font-semibold text-gray-900">
+                <span className="flex size-5 items-center justify-center rounded-full bg-amber-100">
+                  <ExclamationTriangleIcon className="size-3 text-amber-600" aria-hidden="true" />
+                </span>
+                Needs Attention ({groupedWizards.attention.length})
+              </h2>
+              <WizardList wizards={groupedWizards.attention} projectId={projectId} />
+            </section>
+          )}
+
+          {/* Pending Section */}
+          {groupedWizards.pending.length > 0 && (
+            <section>
+              <h2 className="mb-3 flex items-center gap-x-2 text-sm font-semibold text-gray-900">
+                <span className="flex size-5 items-center justify-center rounded-full bg-gray-100">
+                  <ClockIcon className="size-3 text-gray-600" aria-hidden="true" />
+                </span>
+                Not Started ({groupedWizards.pending.length})
+              </h2>
+              <WizardList wizards={groupedWizards.pending} projectId={projectId} />
+            </section>
+          )}
+
+          {/* Completed Section */}
+          {groupedWizards.completed.length > 0 && (
+            <section>
+              <h2 className="mb-3 flex items-center gap-x-2 text-sm font-semibold text-gray-900">
+                <span className="flex size-5 items-center justify-center rounded-full bg-green-100">
+                  <CheckCircleIcon className="size-3 text-green-600" aria-hidden="true" />
+                </span>
+                Completed ({groupedWizards.completed.length})
+              </h2>
+              <WizardList wizards={groupedWizards.completed} projectId={projectId} />
+            </section>
+          )}
+        </div>
+      ) : (
+        <div className="rounded-xl bg-white p-12 shadow-sm ring-1 ring-gray-900/5">
+          <EmptyState
+            variant="wizards"
+            description="No onboarding wizards have been created for this project yet."
+          />
+        </div>
+      )}
+    </AppShell>
+  )
+}
+
+/**
+ * WizardList component for displaying a group of wizards
+ */
+function WizardList({ wizards, projectId }: { wizards: WizardInstance[]; projectId: string }) {
+  return (
+    <ul className="divide-y divide-gray-100 rounded-lg bg-white shadow-sm ring-1 ring-gray-900/5">
+      {wizards.map((instance) => (
+        <li key={instance.id}>
+          <Link
+            href={`/projects/${projectId}/wizards/${instance.id}`}
+            className="group flex items-center justify-between px-4 py-4 hover:bg-gray-50 sm:px-6"
+          >
+            <div className="flex items-center gap-x-4">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-gray-100 group-hover:bg-indigo-50">
+                <ClipboardDocumentListIcon className="size-5 text-gray-400 group-hover:text-indigo-600" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-gray-900 group-hover:text-indigo-600">
+                  {instance.wizards?.name ?? 'Unnamed wizard'}
+                </p>
+                {instance.wizards?.description && (
+                  <p className="mt-0.5 truncate text-sm text-gray-500">
+                    {instance.wizards.description}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-x-4">
+              <StatusBadge status={instance.status as WizardStatus} size="sm" />
+              <div className="hidden items-center gap-x-2 sm:flex">
+                <div className="h-2 w-24 overflow-hidden rounded-full bg-gray-200">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      instance.status === 'completed' ? 'bg-green-500' : 'bg-indigo-600'
+                    }`}
+                    style={{ width: `${instance.progress_percentage ?? 0}%` }}
+                  />
+                </div>
+                <span className="w-10 text-right text-sm text-gray-500">
+                  {instance.progress_percentage ?? 0}%
+                </span>
+              </div>
+              <ChevronRightIcon className="size-5 text-gray-400" aria-hidden="true" />
+            </div>
+          </Link>
+        </li>
+      ))}
+    </ul>
   )
 }

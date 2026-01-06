@@ -1,7 +1,40 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { ChevronRightIcon, ArrowLeftIcon, LockClosedIcon, RocketLaunchIcon, ChartBarIcon } from '@heroicons/react/24/outline'
-import { StatusBadge, Header, Footer } from '@/components/ui'
+import { redirect } from 'next/navigation'
+import { ChevronRightIcon, FolderIcon } from '@heroicons/react/24/outline'
+import { AppShell } from '@/components/layout'
+import { StatusBadge, ProgressRing, EmptyState } from '@/components/ui'
+import type { WizardStatus } from '@/components/ui'
+
+/**
+ * Projects Page
+ * 
+ * Design principles:
+ * - Progress and status are dominant
+ * - Clear project cards with immediate workload sense
+ * - Strong empty state
+ * - Uses AppShell for authenticated layout
+ */
+
+type Project = {
+  id: string
+  name: string
+  status: string
+  created_at: string
+}
+
+type WizardInstance = {
+  id: string
+  status: string
+  progress_percentage: number
+}
+
+type ProjectWithProgress = Project & {
+  wizard_instances: WizardInstance[]
+  totalWizards: number
+  completedWizards: number
+  avgProgress: number
+}
 
 export default async function ProjectsPage() {
   const supabase = await createClient()
@@ -10,172 +43,128 @@ export default async function ProjectsPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
+  // Redirect to login if not authenticated
   if (!user) {
-    return (
-      <div className="bg-white">
-        <Header />
-        
-        <div className="relative isolate px-6 pt-14 lg:px-8">
-          <div className="mx-auto max-w-2xl py-32 sm:py-48">
-            <div className="text-center">
-              <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-indigo-100 mb-6">
-                <LockClosedIcon className="size-8 text-indigo-600" />
-              </div>
-              <h1 className="text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">
-                Projects
-              </h1>
-              <p className="mt-6 text-lg/8 text-gray-600">
-                Sign in to access your onboarding projects and wizards.
-              </p>
-              <div className="mt-10 flex items-center justify-center gap-x-6">
-                <Link
-                  href="/login"
-                  className="rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-                >
-                  Sign in to continue
-                </Link>
-                <Link href="/" className="text-sm/6 font-semibold text-gray-900">
-                  Back to home <span aria-hidden="true">→</span>
-                </Link>
-              </div>
-
-              {/* Feature preview */}
-              <div className="mt-16 border-t border-gray-200 pt-16">
-                <h2 className="text-base/7 font-semibold text-indigo-600 mb-8">What you get with Projects</h2>
-                <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
-                  <div>
-                    <div className="mx-auto flex size-12 items-center justify-center rounded-lg bg-indigo-50">
-                      <RocketLaunchIcon className="size-6 text-indigo-600" />
-                    </div>
-                    <h3 className="mt-4 text-sm font-semibold text-gray-900">Manage Projects</h3>
-                    <p className="mt-2 text-sm text-gray-600">
-                      Track all your onboarding projects in one place
-                    </p>
-                  </div>
-                  <div>
-                    <div className="mx-auto flex size-12 items-center justify-center rounded-lg bg-indigo-50">
-                      <ChartBarIcon className="size-6 text-indigo-600" />
-                    </div>
-                    <h3 className="mt-4 text-sm font-semibold text-gray-900">Track Progress</h3>
-                    <p className="mt-2 text-sm text-gray-600">
-                      Real-time progress tracking for all wizards
-                    </p>
-                  </div>
-                  <div>
-                    <div className="mx-auto flex size-12 items-center justify-center rounded-lg bg-indigo-50">
-                      <svg className="size-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                    </div>
-                    <h3 className="mt-4 text-sm font-semibold text-gray-900">Generate Summaries</h3>
-                    <p className="mt-2 text-sm text-gray-600">
-                      Automated customer and PM summaries
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <Footer />
-      </div>
-    )
+    redirect('/login')
   }
 
+  // Fetch projects with wizard instance counts for progress
   const { data: projects, error } = await supabase
     .from('projects')
-    .select('id, name, status, created_at')
+    .select(`
+      id,
+      name,
+      status,
+      created_at,
+      wizard_instances (
+        id,
+        status,
+        progress_percentage
+      )
+    `)
     .order('created_at', { ascending: false })
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 px-6 py-24 sm:py-32 lg:px-8">
-        <div className="mx-auto max-w-2xl">
-          <h1 className="text-4xl font-semibold tracking-tight text-gray-900">Projects</h1>
-          <div className="mt-6 rounded-md bg-red-50 p-4">
-            <p className="text-sm text-red-800">Error loading projects: {error.message}</p>
-          </div>
+      <AppShell 
+        user={{ email: user.email ?? '' }}
+        breadcrumbs={[{ name: 'Projects' }]}
+      >
+        <div className="rounded-lg bg-red-50 p-4">
+          <p className="text-sm text-red-800">Error loading projects: {error.message}</p>
         </div>
-      </div>
+      </AppShell>
     )
   }
 
+  // Calculate progress metrics for each project
+  const projectsWithProgress: ProjectWithProgress[] = (projects ?? []).map((project) => {
+    const wizards = project.wizard_instances ?? []
+    const totalWizards = wizards.length
+    const completedWizards = wizards.filter((w: WizardInstance) => w.status === 'completed').length
+    const avgProgress = totalWizards > 0
+      ? Math.round(wizards.reduce((sum: number, w: WizardInstance) => sum + (w.progress_percentage ?? 0), 0) / totalWizards)
+      : 0
+
+    return {
+      ...project,
+      wizard_instances: wizards,
+      totalWizards,
+      completedWizards,
+      avgProgress,
+    }
+  })
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-x-1.5 text-sm font-semibold text-gray-900 hover:text-indigo-600"
-          >
-            <ArrowLeftIcon aria-hidden="true" className="size-4" />
-            Back to Home
-          </Link>
-        </div>
+    <AppShell 
+      user={{ email: user.email ?? '' }}
+      breadcrumbs={[{ name: 'Projects' }]}
+    >
+      {/* Page Header */}
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          {projectsWithProgress.length === 0 
+            ? 'No active projects'
+            : `${projectsWithProgress.length} project${projectsWithProgress.length === 1 ? '' : 's'}`
+          }
+        </p>
       </div>
 
-      {/* Main Content */}
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Page Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-semibold tracking-tight text-gray-900">My Projects</h1>
-          <p className="mt-2 text-sm text-gray-600">Logged in as: {user.email}</p>
-        </div>
-
-        {/* Projects List */}
-        {projects && projects.length > 0 ? (
-          <ul className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {projects.map((project: { id: string; name: string; status: string; created_at: string }) => (
-              <li
-                key={project.id}
-                className="col-span-1 divide-y divide-gray-200 rounded-lg bg-white shadow-sm inset-ring inset-ring-gray-200"
+      {/* Projects Grid */}
+      {projectsWithProgress.length > 0 ? (
+        <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {projectsWithProgress.map((project) => (
+            <li key={project.id}>
+              <Link
+                href={`/projects/${project.id}`}
+                className="group relative block rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5 transition hover:shadow-md"
               >
-                <div className="flex w-full items-center justify-between gap-x-6 p-6">
-                  <div className="min-w-0 flex-1">
-                    <h2 className="text-lg font-semibold text-gray-900 truncate">{project.name}</h2>
-                    <div className="mt-2 flex items-center gap-x-2">
-                      <StatusBadge status={project.status as any} />
+                {/* Project header */}
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-x-3">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50 group-hover:bg-indigo-100">
+                      <FolderIcon className="size-5 text-indigo-600" aria-hidden="true" />
                     </div>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Created {new Date(project.created_at).toLocaleDateString()}
-                    </p>
+                    <div className="min-w-0">
+                      <h2 className="truncate text-sm font-semibold text-gray-900 group-hover:text-indigo-600">
+                        {project.name}
+                      </h2>
+                      <p className="text-xs text-gray-500">
+                        {project.totalWizards} wizard{project.totalWizards === 1 ? '' : 's'}
+                      </p>
+                    </div>
                   </div>
+                  <ProgressRing progress={project.avgProgress} size="sm" />
                 </div>
-                <div className="px-6 py-4">
-                  <Link
-                    href={`/projects/${project.id}/wizards`}
-                    className="inline-flex items-center gap-x-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-500"
-                  >
-                    View Wizards
-                    <ChevronRightIcon aria-hidden="true" className="size-4" />
-                  </Link>
+
+                {/* Status and progress */}
+                <div className="mt-4 flex items-center justify-between">
+                  <StatusBadge status={project.status as WizardStatus} />
+                  <span className="text-xs text-gray-500">
+                    {project.completedWizards}/{project.totalWizards} complete
+                  </span>
                 </div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div className="text-center rounded-lg bg-white px-6 py-12 shadow-sm inset-ring inset-ring-gray-200">
-            <svg
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-              className="mx-auto size-12 text-gray-400"
-            >
-              <path
-                d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-              />
-            </svg>
-            <h3 className="mt-2 text-sm font-semibold text-gray-900">No projects</h3>
-            <p className="mt-1 text-sm text-gray-500">Get started by creating a new project.</p>
-          </div>
-        )}
-      </div>
-    </div>
+
+                {/* Hover indicator */}
+                <div className="absolute inset-x-0 bottom-0 flex items-center justify-center pb-2 opacity-0 transition group-hover:opacity-100">
+                  <span className="inline-flex items-center gap-x-1 text-xs font-medium text-indigo-600">
+                    View project
+                    <ChevronRightIcon className="size-3" aria-hidden="true" />
+                  </span>
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div className="rounded-xl bg-white p-12 shadow-sm ring-1 ring-gray-900/5">
+          <EmptyState 
+            variant="projects"
+            description="You don't have any projects assigned yet. Projects will appear here when you're added to an onboarding workflow."
+          />
+        </div>
+      )}
+    </AppShell>
   )
 }

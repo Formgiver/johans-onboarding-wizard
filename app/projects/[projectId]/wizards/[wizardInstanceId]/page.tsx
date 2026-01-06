@@ -1,14 +1,24 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
-import { ArrowLeftIcon } from '@heroicons/react/24/outline'
-import { StatusBadge, WizardProgress } from '@/components/ui'
+import { redirect, notFound } from 'next/navigation'
+import { 
+  CheckCircleIcon,
+  ExclamationCircleIcon,
+} from '@heroicons/react/24/outline'
+import { AppShell } from '@/components/layout'
+import { StatusBadge } from '@/components/ui'
+import type { WizardStatus } from '@/components/ui'
 import WizardInputsClient from './WizardInputsClient'
-// import WizardOutputsClient from './WizardOutputsClient'
-// import {
-//   generateCustomerSummary,
-//   generatePMZendeskDraft,
-// } from '@/lib/wizard-outputs'
+
+/**
+ * Wizard Instance Page
+ * 
+ * Design principles:
+ * - Clear step structure with visual progress
+ * - Step status visible at a glance
+ * - Obvious "what do I do now?"
+ * - Zero ambiguity for customers
+ */
 
 export default async function WizardInstancePage({
   params,
@@ -23,36 +33,22 @@ export default async function WizardInstancePage({
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return (
-      <div className="min-h-screen bg-gray-50 px-6 py-24 sm:py-32 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <h1 className="text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">Wizard Instance</h1>
-          <p className="mt-6 text-lg/8 text-gray-600">
-            You must be logged in to view this wizard.
-          </p>
-          <div className="mt-10">
-            <Link
-              href="/login"
-              className="rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-            >
-              Go to login
-            </Link>
-          </div>
-        </div>
-      </div>
-    )
+    redirect('/login')
   }
 
+  // Fetch wizard instance with related data
   const { data: instance } = await supabase
     .from('wizard_instances')
     .select(`
       id,
       status,
       wizard_id,
-      progress_percent,
+      progress_percentage,
       completed_steps_count,
       total_required_steps,
       project_id,
+      started_at,
+      completed_at,
       wizards (
         id,
         name,
@@ -91,47 +87,28 @@ export default async function WizardInstancePage({
 
   if (!wizard) {
     return (
-      <div className="min-h-screen bg-gray-50 px-6 py-24 sm:py-32 lg:px-8">
-        <div className="mx-auto max-w-2xl">
-          <h1 className="text-4xl font-semibold tracking-tight text-gray-900">Error</h1>
-          <div className="mt-6 rounded-md bg-red-50 p-4">
-            <p className="text-sm text-red-800">Wizard definition not found.</p>
-          </div>
+      <AppShell
+        user={{ email: user.email ?? '' }}
+        breadcrumbs={[
+          { name: 'Projects', href: '/projects' },
+          { name: 'Wizard' },
+        ]}
+      >
+        <div className="rounded-lg bg-red-50 p-4">
+          <p className="text-sm text-red-800">Wizard definition not found.</p>
         </div>
-      </div>
+      </AppShell>
     )
   }
 
+  // Fetch wizard steps
   const { data: steps } = await supabase
     .from('wizard_steps')
     .select('id, step_key, title, description, position, is_required, step_type, config')
     .eq('wizard_id', wizard.id)
     .order('position', { ascending: true })
 
-  if (!steps || steps.length === 0) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white shadow-sm">
-          <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-            <Link
-              href={`/projects/${projectId}/wizards`}
-              className="inline-flex items-center gap-x-1.5 text-sm font-semibold text-gray-900 hover:text-indigo-600"
-            >
-              <ArrowLeftIcon aria-hidden="true" className="size-4" />
-              Back to Wizards
-            </Link>
-          </div>
-        </div>
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <h1 className="text-3xl font-semibold tracking-tight text-gray-900">{wizard.name}</h1>
-          <div className="mt-6 rounded-md bg-yellow-50 p-4">
-            <p className="text-sm text-yellow-800">No steps defined for this wizard.</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
+  // Fetch existing inputs
   const { data: existingInputs } = await supabase
     .from('wizard_step_inputs')
     .select('wizard_step_id, data')
@@ -145,7 +122,7 @@ export default async function WizardInstancePage({
     {} as Record<string, Record<string, unknown>>
   )
 
-  const stepsWithData = steps.map(
+  const stepsWithData = (steps ?? []).map(
     (step: {
       id: string
       step_key: string
@@ -168,86 +145,97 @@ export default async function WizardInstancePage({
     })
   )
 
-  // Prepare data for output generation
-  // const stepsForOutput = steps.map((step) => ({
-  //   step_key: step.step_key,
-  //   title: step.title,
-  //   description: step.description,
-  //   step_type: step.step_type,
-  //   position: step.position,
-  //   is_required: step.is_required,
-  //   input_value: (inputsMap[step.id]?.value as unknown) || null,
-  // }))
-
-  // const customerSummary = generateCustomerSummary(wizard.name, stepsForOutput)
-  // const pmDraft = generatePMZendeskDraft(
-  //   wizard.name,
-  //   project?.name || 'Unknown Project',
-  //   project?.organizations
-  //     ? Array.isArray(project.organizations)
-  //       ? 'Unknown Organization'
-  //       : project.organizations.name
-  //     : 'Unknown Organization',
-  //   stepsForOutput
-  // )
+  // Calculate progress stats
+  const totalSteps = stepsWithData.length
+  const requiredSteps = stepsWithData.filter(s => s.is_required).length
+  const completedSteps = instance.completed_steps_count ?? 0
+  const progress = instance.progress_percentage ?? 0
+  const isCompleted = instance.status === 'completed'
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-          <Link
-            href={`/projects/${projectId}/wizards`}
-            className="inline-flex items-center gap-x-1.5 text-sm font-semibold text-gray-900 hover:text-indigo-600"
-          >
-            <ArrowLeftIcon aria-hidden="true" className="size-4" />
-            Back to Wizards
-          </Link>
+    <AppShell
+      user={{ email: user.email ?? '' }}
+      breadcrumbs={[
+        { name: 'Projects', href: '/projects' },
+        { name: project?.name ?? 'Project', href: `/projects/${projectId}` },
+        { name: 'Wizards', href: `/projects/${projectId}/wizards` },
+        { name: wizard.name },
+      ]}
+    >
+      {/* Wizard Header */}
+      <div className="mb-8">
+        <div className="flex items-start justify-between gap-x-4">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl font-bold text-gray-900">{wizard.name}</h1>
+            {wizard.description && (
+              <p className="mt-1 text-sm text-gray-500">{wizard.description}</p>
+            )}
+          </div>
+          <StatusBadge status={instance.status as WizardStatus} size="md" />
         </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Wizard Header */}
-        <div className="mb-8">
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-3xl font-semibold tracking-tight text-gray-900">{wizard.name}</h1>
-              {wizard.description && <p className="mt-2 text-base text-gray-600">{wizard.description}</p>}
+        {/* Progress summary */}
+        <div className="mt-6 rounded-lg bg-white p-4 shadow-sm ring-1 ring-gray-900/5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-x-6">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Progress</p>
+                <p className="mt-1 text-2xl font-semibold text-gray-900">{progress}%</p>
+              </div>
+              <div className="h-10 w-px bg-gray-200" aria-hidden="true" />
+              <div>
+                <p className="text-sm font-medium text-gray-500">Steps completed</p>
+                <p className="mt-1 text-2xl font-semibold text-gray-900">{completedSteps} / {requiredSteps}</p>
+              </div>
             </div>
-            <StatusBadge status={instance.status as any} />
+            {isCompleted ? (
+              <div className="flex items-center gap-x-2 text-green-600">
+                <CheckCircleIcon className="size-5" aria-hidden="true" />
+                <span className="text-sm font-medium">All requirements met</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-x-2 text-amber-600">
+                <ExclamationCircleIcon className="size-5" aria-hidden="true" />
+                <span className="text-sm font-medium">{requiredSteps - completedSteps} steps remaining</span>
+              </div>
+            )}
           </div>
-
-          {/* Progress Bar */}
-          <div className="mt-6">
-            <WizardProgress
-              completedSteps={instance.completed_steps_count || 0}
-              totalSteps={instance.total_required_steps || 0}
-              percentage={instance.progress_percent || 0}
-            />
+          
+          {/* Progress bar */}
+          <div className="mt-4">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  isCompleted ? 'bg-green-500' : 'bg-indigo-600'
+                }`}
+                style={{ width: `${progress}%` }}
+              />
+            </div>
           </div>
         </div>
-
-        {/* Steps Section */}
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold text-gray-900">Wizard Steps</h2>
-          <p className="mt-1 text-sm text-gray-600">Complete all required steps to finish the wizard.</p>
-        </div>
-
-        <WizardInputsClient
-          wizardInstanceId={wizardInstanceId}
-          steps={stepsWithData}
-          projectCountry={project?.country || undefined}
-        />
-
-        {/* <hr style={{ margin: '30px 0', border: 'none', borderTop: '1px solid #ccc' }} />
-
-        <h2>Outputs & Summaries</h2>
-        <WizardOutputsClient
-          customerSummary={customerSummary}
-          pmDraft={pmDraft}
-        /> */}
       </div>
-    </div>
+
+      {/* Steps Section */}
+      {totalSteps > 0 ? (
+        <div>
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Steps</h2>
+            <p className="text-sm text-gray-500">
+              Complete each step below. Required steps are marked with an asterisk.
+            </p>
+          </div>
+
+          <WizardInputsClient
+            wizardInstanceId={wizardInstanceId}
+            steps={stepsWithData}
+            projectCountry={project?.country || undefined}
+          />
+        </div>
+      ) : (
+        <div className="rounded-lg bg-amber-50 p-4">
+          <p className="text-sm text-amber-800">No steps have been configured for this wizard yet.</p>
+        </div>
+      )}
+    </AppShell>
   )
 }

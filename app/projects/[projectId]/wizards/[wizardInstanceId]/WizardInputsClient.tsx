@@ -1,8 +1,23 @@
 'use client'
 
-import { useState } from 'react'
-import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline'
-import { Button, Alert } from '@/components/ui'
+import { useState, useCallback } from 'react'
+import { 
+  CheckCircleIcon, 
+  ExclamationCircleIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+} from '@heroicons/react/24/outline'
+import { CheckIcon } from '@heroicons/react/20/solid'
+
+/**
+ * WizardInputsClient - Guided step input form
+ * 
+ * Design principles:
+ * - Inputs feel guided, safe, and understandable
+ * - Clear validation feedback
+ * - Auto-save with visual confirmation
+ * - Collapsible completed steps to reduce cognitive load
+ */
 
 type StepInput = {
   step_id: string
@@ -22,11 +37,24 @@ type WizardInputsClientProps = {
   projectCountry?: string
 }
 
+type StepStatus = 'empty' | 'partial' | 'complete'
+
+function getStepStatus(step: StepInput, value: unknown): StepStatus {
+  if (step.step_type === 'checkbox') {
+    return value === true ? 'complete' : 'empty'
+  }
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return 'complete'
+  }
+  return 'empty'
+}
+
 export default function WizardInputsClient({
   wizardInstanceId,
   steps,
   projectCountry,
 }: WizardInputsClientProps) {
+  // Initialize form data from existing data
   const [formData, setFormData] = useState<Record<string, unknown>>(
     steps.reduce((acc, step) => {
       const existingValue = step.existing_data.value
@@ -40,11 +68,31 @@ export default function WizardInputsClient({
   )
 
   const [saving, setSaving] = useState<Record<string, boolean>>({})
-  const [messages, setMessages] = useState<Record<string, { type: 'success' | 'error'; text: string }>>({})
+  const [savedStatus, setSavedStatus] = useState<Record<string, boolean>>(
+    // Mark steps with existing data as saved
+    steps.reduce((acc, step) => {
+      if (step.existing_data.value !== undefined) {
+        acc[step.step_id] = true
+      }
+      return acc
+    }, {} as Record<string, boolean>)
+  )
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [expandedSteps, setExpandedSteps] = useState<Record<string, boolean>>(
+    // Expand steps that are not completed
+    steps.reduce((acc, step) => {
+      const value = step.existing_data.value
+      const isComplete = step.step_type === 'checkbox' 
+        ? value === true 
+        : typeof value === 'string' && value.trim().length > 0
+      acc[step.step_id] = !isComplete
+      return acc
+    }, {} as Record<string, boolean>)
+  )
 
-  const handleSave = async (stepId: string) => {
+  const handleSave = useCallback(async (stepId: string) => {
     setSaving((prev) => ({ ...prev, [stepId]: true }))
-    setMessages((prev) => {
+    setErrors((prev) => {
       const copy = { ...prev }
       delete copy[stepId]
       return copy
@@ -68,201 +116,286 @@ export default function WizardInputsClient({
         throw new Error(errorData.error || 'Failed to save')
       }
 
-      setMessages((prev) => ({
-        ...prev,
-        [stepId]: { type: 'success', text: 'Saved successfully' },
-      }))
+      setSavedStatus((prev) => ({ ...prev, [stepId]: true }))
+      
+      // Collapse after successful save if complete
+      const step = steps.find(s => s.step_id === stepId)
+      if (step) {
+        const value = formData[stepId]
+        const isComplete = step.step_type === 'checkbox'
+          ? value === true
+          : typeof value === 'string' && value.trim().length > 0
+        if (isComplete) {
+          setExpandedSteps((prev) => ({ ...prev, [stepId]: false }))
+        }
+      }
     } catch (err) {
-      setMessages((prev) => ({
+      setErrors((prev) => ({
         ...prev,
-        [stepId]: {
-          type: 'error',
-          text: err instanceof Error ? err.message : 'Failed to save',
-        },
+        [stepId]: err instanceof Error ? err.message : 'Failed to save',
       }))
     } finally {
       setSaving((prev) => ({ ...prev, [stepId]: false }))
     }
-  }
+  }, [formData, steps, wizardInstanceId])
 
-  const renderStepInput = (step: StepInput) => {
-    const value = formData[step.step_id]
+  const handleChange = useCallback((stepId: string, value: unknown) => {
+    setFormData((prev) => ({ ...prev, [stepId]: value }))
+    // Mark as unsaved when changed
+    setSavedStatus((prev) => ({ ...prev, [stepId]: false }))
+  }, [])
 
-    switch (step.step_type) {
-      case 'text':
+  const toggleStep = useCallback((stepId: string) => {
+    setExpandedSteps((prev) => ({ ...prev, [stepId]: !prev[stepId] }))
+  }, [])
+
+  // Filter out steps that don't apply to the project's country
+  const visibleSteps = steps.filter((step) => {
+    if (step.step_type === 'country_specific') {
+      const allowedCountries = (step.config.countries as string[]) || []
+      if (projectCountry && !allowedCountries.includes(projectCountry)) {
+        return false
+      }
+    }
+    return true
+  })
+
+  return (
+    <div className="space-y-4">
+      {visibleSteps.map((step, index) => {
+        const value = formData[step.step_id]
+        const status = getStepStatus(step, value)
+        const isExpanded = expandedSteps[step.step_id]
+        const isSaved = savedStatus[step.step_id]
+        const isSaving = saving[step.step_id]
+        const error = errors[step.step_id]
+
         return (
+          <div
+            key={step.step_id}
+            className={`overflow-hidden rounded-lg bg-white shadow-sm ring-1 transition-all ${
+              error 
+                ? 'ring-red-300' 
+                : status === 'complete' && isSaved
+                  ? 'ring-green-200'
+                  : 'ring-gray-200'
+            }`}
+          >
+            {/* Step Header - Always visible */}
+            <button
+              type="button"
+              onClick={() => toggleStep(step.step_id)}
+              className="flex w-full items-center justify-between p-4 text-left hover:bg-gray-50"
+            >
+              <div className="flex items-center gap-x-3">
+                {/* Step number/status indicator */}
+                <div
+                  className={`flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-medium ${
+                    status === 'complete' && isSaved
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-gray-100 text-gray-700'
+                  }`}
+                >
+                  {status === 'complete' && isSaved ? (
+                    <CheckIcon className="size-4" aria-hidden="true" />
+                  ) : (
+                    index + 1
+                  )}
+                </div>
+                
+                {/* Step title */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">
+                    {step.title}
+                    {step.is_required && (
+                      <span className="ml-1 text-red-500" aria-label="Required">*</span>
+                    )}
+                  </h3>
+                  {!isExpanded && status === 'complete' && (
+                    <p className="mt-0.5 truncate text-xs text-gray-500">
+                      {step.step_type === 'checkbox' 
+                        ? 'Confirmed' 
+                        : String(value).slice(0, 50) + (String(value).length > 50 ? '...' : '')
+                      }
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-x-2">
+                {isSaving && (
+                  <span className="text-xs text-gray-500">Saving...</span>
+                )}
+                {status === 'complete' && isSaved && !isExpanded && (
+                  <span className="inline-flex items-center gap-x-1 text-xs text-green-600">
+                    <CheckCircleIcon className="size-4" />
+                    Saved
+                  </span>
+                )}
+                {isExpanded ? (
+                  <ChevronUpIcon className="size-5 text-gray-400" />
+                ) : (
+                  <ChevronDownIcon className="size-5 text-gray-400" />
+                )}
+              </div>
+            </button>
+
+            {/* Step Content - Expandable */}
+            {isExpanded && (
+              <div className="border-t border-gray-100 px-4 pb-4 pt-4">
+                {step.description && (
+                  <p className="mb-4 text-sm text-gray-600">{step.description}</p>
+                )}
+
+                {/* Input field */}
+                <div className="space-y-4">
+                  <StepInputField
+                    step={step}
+                    value={value}
+                    onChange={(newValue) => handleChange(step.step_id, newValue)}
+                  />
+
+                  {/* Error message */}
+                  {error && (
+                    <div className="flex items-center gap-x-2 text-sm text-red-600">
+                      <ExclamationCircleIcon className="size-4" />
+                      {error}
+                    </div>
+                  )}
+
+                  {/* Save button and status */}
+                  <div className="flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => handleSave(step.step_id)}
+                      disabled={isSaving}
+                      className="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:bg-indigo-400"
+                    >
+                      {isSaving ? (
+                        <>
+                          <svg className="mr-2 size-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Saving...
+                        </>
+                      ) : (
+                        'Save answer'
+                      )}
+                    </button>
+
+                    {isSaved && !isSaving && (
+                      <span className="inline-flex items-center gap-x-1 text-sm text-green-600">
+                        <CheckCircleIcon className="size-4" />
+                        Saved
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * StepInputField renders the appropriate input based on step type
+ */
+function StepInputField({
+  step,
+  value,
+  onChange,
+}: {
+  step: StepInput
+  value: unknown
+  onChange: (value: unknown) => void
+}) {
+  const inputClasses = "block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm"
+
+  switch (step.step_type) {
+    case 'text':
+    case 'country_specific':
+      return (
+        <div>
+          <label htmlFor={`input-${step.step_id}`} className="sr-only">
+            {step.title}
+          </label>
           <input
             type="text"
             id={`input-${step.step_id}`}
             value={(value as string) || ''}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, [step.step_id]: e.target.value }))
-            }
-            placeholder={(step.config.placeholder as string) || ''}
-            className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={(step.config.placeholder as string) || 'Enter your answer...'}
+            className={inputClasses}
           />
-        )
+        </div>
+      )
 
-      case 'textarea':
-        return (
+    case 'textarea':
+      return (
+        <div>
+          <label htmlFor={`input-${step.step_id}`} className="sr-only">
+            {step.title}
+          </label>
           <textarea
             id={`input-${step.step_id}`}
             value={(value as string) || ''}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, [step.step_id]: e.target.value }))
-            }
-            placeholder={(step.config.placeholder as string) || ''}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={(step.config.placeholder as string) || 'Enter your answer...'}
             rows={(step.config.rows as number) || 4}
-            className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+            className={inputClasses}
           />
-        )
+        </div>
+      )
 
-      case 'select': {
-        const options = (step.config.options as Array<{ value: string; label: string }>) || []
-        return (
+    case 'select': {
+      const options = (step.config.options as Array<{ value: string; label: string }>) || []
+      return (
+        <div>
+          <label htmlFor={`input-${step.step_id}`} className="sr-only">
+            {step.title}
+          </label>
           <select
             id={`input-${step.step_id}`}
             value={(value as string) || ''}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, [step.step_id]: e.target.value }))
-            }
-            className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+            onChange={(e) => onChange(e.target.value)}
+            className={inputClasses}
           >
-            <option value="">-- Select --</option>
+            <option value="">Select an option...</option>
             {options.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
             ))}
           </select>
-        )
-      }
-
-      case 'checkbox':
-        return (
-          <div className="relative flex items-start">
-            <div className="flex h-6 items-center">
-              <input
-                type="checkbox"
-                id={`input-${step.step_id}`}
-                checked={(value as boolean) || false}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, [step.step_id]: e.target.checked }))
-                }
-                className="size-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600"
-              />
-            </div>
-            <div className="ml-3 text-sm/6">
-              <label htmlFor={`input-${step.step_id}`} className="font-medium text-gray-900 cursor-pointer">
-                {(step.config.label as string) || 'Confirm'}
-              </label>
-            </div>
-          </div>
-        )
-
-      case 'country_specific':
-        return (
-          <input
-            type="text"
-            id={`input-${step.step_id}`}
-            value={(value as string) || ''}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, [step.step_id]: e.target.value }))
-            }
-            placeholder={(step.config.placeholder as string) || ''}
-            className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
-          />
-        )
-
-      default:
-        return (
-          <textarea
-            id={`input-${step.step_id}`}
-            value={JSON.stringify(step.existing_data, null, 2)}
-            readOnly
-            className="block w-full rounded-md bg-gray-50 px-3 py-1.5 text-xs font-mono text-gray-900 outline-1 -outline-offset-1 outline-gray-300 min-h-20"
-          />
-        )
+        </div>
+      )
     }
+
+    case 'checkbox':
+      return (
+        <label className="flex cursor-pointer items-center gap-x-3 rounded-lg border border-gray-200 p-4 hover:bg-gray-50">
+          <input
+            type="checkbox"
+            id={`input-${step.step_id}`}
+            checked={(value as boolean) || false}
+            onChange={(e) => onChange(e.target.checked)}
+            className="size-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600"
+          />
+          <span className="text-sm text-gray-700">
+            {(step.config.label as string) || 'I confirm this is correct'}
+          </span>
+        </label>
+      )
+
+    default:
+      return (
+        <div className="rounded-md bg-gray-50 p-3">
+          <p className="text-xs text-gray-500">Unsupported input type: {step.step_type}</p>
+        </div>
+      )
   }
-
-  return (
-    <div>
-      {steps.map((step) => {
-        if (step.step_type === 'country_specific') {
-          const allowedCountries = (step.config.countries as string[]) || []
-          if (projectCountry && !allowedCountries.includes(projectCountry)) {
-            return null
-          }
-        }
-
-        return (
-          <div
-            key={step.step_id}
-            className="rounded-lg bg-white shadow-sm inset-ring inset-ring-gray-200 p-6 mb-6"
-          >
-            <div className="mb-4">
-              <h3 className="text-base font-semibold text-gray-900">
-                {step.position}. {step.title}
-                {step.is_required && <span className="text-red-600"> *</span>}
-              </h3>
-              {step.description && (
-                <p className="mt-1 text-sm text-gray-600">{step.description}</p>
-              )}
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label htmlFor={`input-${step.step_id}`} className="block text-sm font-medium text-gray-900 mb-2">
-                  {step.step_type === 'checkbox' ? '' : 'Your answer'}
-                </label>
-                {renderStepInput(step)}
-              </div>
-
-              <div className="flex items-center gap-x-4">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => handleSave(step.step_id)}
-                  disabled={saving[step.step_id]}
-                >
-                  {saving[step.step_id] ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 size-4 text-white" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      Saving...
-                    </>
-                  ) : (
-                    'Save'
-                  )}
-                </Button>
-
-                {messages[step.step_id] && (
-                  <div className="flex items-center gap-x-2">
-                    {messages[step.step_id].type === 'success' ? (
-                      <>
-                        <CheckCircleIcon className="size-5 text-green-600" />
-                        <span className="text-sm font-medium text-green-600">
-                          {messages[step.step_id].text}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <XCircleIcon className="size-5 text-red-600" />
-                        <span className="text-sm font-medium text-red-600">
-                          {messages[step.step_id].text}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
 }
