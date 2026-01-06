@@ -12,6 +12,7 @@ import {
   ArrowRightStartOnRectangleIcon,
 } from '@heroicons/react/24/outline'
 import { createClient } from '@/lib/supabase/client'
+import { LogoFallback, DarkModeToggle } from '@/components/ui'
 
 type NavigationItem = {
   name: string
@@ -44,6 +45,7 @@ type AppShellProps = {
  * - Responsive sidebar navigation (collapsible on mobile)
  * - Breadcrumb trail for orientation
  * - User context and sign-out
+ * - Dark mode support
  * 
  * Use this as the wrapper for all authenticated pages.
  */
@@ -58,7 +60,7 @@ export default function AppShell({ children, user, breadcrumbs }: AppShellProps)
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Mobile sidebar */}
       <Transition show={sidebarOpen} as={Fragment}>
         <Dialog onClose={setSidebarOpen} className="relative z-50 lg:hidden">
@@ -106,15 +108,10 @@ export default function AppShell({ children, user, breadcrumbs }: AppShellProps)
                   </div>
                 </TransitionChild>
 
-                <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white px-6 pb-4">
+                <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white px-6 pb-4 dark:bg-gray-800">
                   <div className="flex h-16 shrink-0 items-center">
-                    <Link href="/" className="flex items-center gap-x-2">
-                      <div className="flex size-8 items-center justify-center rounded-lg bg-indigo-600">
-                        <svg className="size-5 text-white" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V7.3l7-3.11v8.8z"/>
-                        </svg>
-                      </div>
-                      <span className="text-lg font-semibold text-gray-900">Onboarding</span>
+                    <Link href="/">
+                      <LogoFallback size="sm" />
                     </Link>
                   </div>
                   <nav className="flex flex-1 flex-col">
@@ -127,8 +124,8 @@ export default function AppShell({ children, user, breadcrumbs }: AppShellProps)
                                 href={item.href}
                                 className={classNames(
                                   pathname === item.href
-                                    ? 'bg-gray-50 text-indigo-600'
-                                    : 'text-gray-700 hover:bg-gray-50 hover:text-indigo-600',
+                                    ? 'bg-gray-50 text-indigo-600 dark:bg-gray-700 dark:text-indigo-400'
+                                    : 'text-gray-700 hover:bg-gray-50 hover:text-indigo-600 dark:text-gray-200 dark:hover:bg-gray-700 dark:hover:text-indigo-400',
                                   'group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold'
                                 )}
                               >
@@ -136,8 +133,8 @@ export default function AppShell({ children, user, breadcrumbs }: AppShellProps)
                                   aria-hidden="true"
                                   className={classNames(
                                     pathname === item.href
-                                      ? 'text-indigo-600'
-                                      : 'text-gray-400 group-hover:text-indigo-600',
+                                      ? 'text-indigo-600 dark:text-indigo-400'
+                                      : 'text-gray-400 group-hover:text-indigo-600 dark:text-gray-500 dark:group-hover:text-indigo-400',
                                     'size-6 shrink-0'
                                   )}
                                 />
@@ -150,11 +147,11 @@ export default function AppShell({ children, user, breadcrumbs }: AppShellProps)
                       <li className="mt-auto">
                         <button
                           onClick={handleSignOut}
-                          className="group -mx-2 flex w-full gap-x-3 rounded-md p-2 text-sm/6 font-semibold text-gray-700 hover:bg-gray-50 hover:text-indigo-600"
+                          className="group -mx-2 flex w-full gap-x-3 rounded-md p-2 text-sm/6 font-semibold text-gray-700 hover:bg-gray-50 hover:text-indigo-600 dark:text-gray-200 dark:hover:bg-gray-700 dark:hover:text-indigo-400"
                         >
                           <ArrowRightStartOnRectangleIcon
                             aria-hidden="true"
-                            className="size-6 shrink-0 text-gray-400 group-hover:text-indigo-600"
+                            className="size-6 shrink-0 text-gray-400 group-hover:text-indigo-600 dark:text-gray-500 dark:group-hover:text-indigo-400"
                           />
                           Sign out
                         </button>
@@ -170,15 +167,10 @@ export default function AppShell({ children, user, breadcrumbs }: AppShellProps)
 
       {/* Static sidebar for desktop */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
-        <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white px-6 pb-4">
+        <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white px-6 pb-4 dark:border-gray-700 dark:bg-gray-800">
           <div className="flex h-16 shrink-0 items-center">
-            <Link href="/" className="flex items-center gap-x-2">
-              <div className="flex size-8 items-center justify-center rounded-lg bg-indigo-600">
-                <svg className="size-5 text-white" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V7.3l7-3.11v8.8z"/>
-                </svg>
-              </div>
-              <span className="text-lg font-semibold text-gray-900">Onboarding</span>
+            <Link href="/">
+              <LogoFallback size="sm" />
             </Link>
           </div>
           <nav className="flex flex-1 flex-col">
@@ -191,8 +183,8 @@ export default function AppShell({ children, user, breadcrumbs }: AppShellProps)
                         href={item.href}
                         className={classNames(
                           pathname === item.href
-                            ? 'bg-gray-50 text-indigo-600'
-                            : 'text-gray-700 hover:bg-gray-50 hover:text-indigo-600',
+                            ? 'bg-gray-50 text-indigo-600 dark:bg-gray-700 dark:text-indigo-400'
+                            : 'text-gray-700 hover:bg-gray-50 hover:text-indigo-600 dark:text-gray-200 dark:hover:bg-gray-700 dark:hover:text-indigo-400',
                           'group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold'
                         )}
                       >
@@ -200,8 +192,8 @@ export default function AppShell({ children, user, breadcrumbs }: AppShellProps)
                           aria-hidden="true"
                           className={classNames(
                             pathname === item.href
-                              ? 'text-indigo-600'
-                              : 'text-gray-400 group-hover:text-indigo-600',
+                              ? 'text-indigo-600 dark:text-indigo-400'
+                              : 'text-gray-400 group-hover:text-indigo-600 dark:text-gray-500 dark:group-hover:text-indigo-400',
                             'size-6 shrink-0'
                           )}
                         />
@@ -212,17 +204,17 @@ export default function AppShell({ children, user, breadcrumbs }: AppShellProps)
                 </ul>
               </li>
               <li className="mt-auto">
-                <div className="flex items-center gap-x-4 px-2 py-3 text-sm font-semibold text-gray-900">
-                  <div className="flex size-8 items-center justify-center rounded-full bg-gray-100 text-gray-600">
+                <div className="flex items-center gap-x-4 px-2 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                  <div className="flex size-8 items-center justify-center rounded-full bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
                     {user.email.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-gray-900">
+                    <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
                       {user.email}
                     </p>
                     <button
                       onClick={handleSignOut}
-                      className="text-xs text-gray-500 hover:text-indigo-600"
+                      className="text-xs text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400"
                     >
                       Sign out
                     </button>
@@ -236,23 +228,23 @@ export default function AppShell({ children, user, breadcrumbs }: AppShellProps)
 
       {/* Main content */}
       <div className="lg:pl-72">
-        {/* Top bar with mobile menu and breadcrumbs */}
-        <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
+        {/* Top bar with mobile menu, breadcrumbs and theme toggle */}
+        <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8 dark:border-gray-700 dark:bg-gray-800">
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
-            className="-m-2.5 p-2.5 text-gray-700 lg:hidden"
+            className="-m-2.5 p-2.5 text-gray-700 lg:hidden dark:text-gray-200"
           >
             <span className="sr-only">Open sidebar</span>
             <Bars3Icon aria-hidden="true" className="size-6" />
           </button>
 
           {/* Separator */}
-          <div aria-hidden="true" className="h-6 w-px bg-gray-200 lg:hidden" />
+          <div aria-hidden="true" className="h-6 w-px bg-gray-200 lg:hidden dark:bg-gray-700" />
 
           {/* Breadcrumbs */}
           {breadcrumbs && breadcrumbs.length > 0 && (
-            <nav aria-label="Breadcrumb" className="flex">
+            <nav aria-label="Breadcrumb" className="flex flex-1">
               <ol role="list" className="flex items-center space-x-2">
                 {breadcrumbs.map((item, index) => (
                   <li key={item.name} className="flex items-center">
@@ -261,7 +253,7 @@ export default function AppShell({ children, user, breadcrumbs }: AppShellProps)
                         fill="currentColor"
                         viewBox="0 0 20 20"
                         aria-hidden="true"
-                        className="mr-2 size-5 shrink-0 text-gray-300"
+                        className="mr-2 size-5 shrink-0 text-gray-300 dark:text-gray-600"
                       >
                         <path d="M5.555 17.776l8-16 .894.448-8 16-.894-.448z" />
                       </svg>
@@ -269,18 +261,24 @@ export default function AppShell({ children, user, breadcrumbs }: AppShellProps)
                     {item.href ? (
                       <Link
                         href={item.href}
-                        className="text-sm font-medium text-gray-500 hover:text-gray-700"
+                        className="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                       >
                         {item.name}
                       </Link>
                     ) : (
-                      <span className="text-sm font-medium text-gray-900">{item.name}</span>
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">{item.name}</span>
                     )}
                   </li>
                 ))}
               </ol>
             </nav>
           )}
+
+          {/* Spacer if no breadcrumbs */}
+          {(!breadcrumbs || breadcrumbs.length === 0) && <div className="flex-1" />}
+
+          {/* Theme toggle */}
+          <DarkModeToggle />
         </div>
 
         {/* Page content */}

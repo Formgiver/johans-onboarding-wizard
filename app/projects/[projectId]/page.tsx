@@ -51,44 +51,48 @@ export default async function ProjectPage({
     redirect('/login')
   }
 
-  // Fetch project with wizard instances
-  const { data: project, error } = await supabase
+  // Fetch project (simple query without join - FK not set up yet)
+  const { data: project, error: projectError } = await supabase
     .from('projects')
-    .select(`
-      id,
-      name,
-      status,
-      created_at,
-      wizard_instances (
-        id,
-        status,
-        progress_percentage,
-        started_at,
-        completed_at,
-        wizards (
-          id,
-          name,
-          description
-        )
-      )
-    `)
+    .select('id, name, status, created_at')
     .eq('id', projectId)
     .single()
 
-  if (error || !project) {
+  if (projectError || !project) {
     notFound()
   }
 
-  // Handle the Supabase return type (could be array due to join)
-  const rawWizards = project.wizard_instances ?? []
-  const wizards: WizardInstanceRaw[] = rawWizards.map((w: Record<string, unknown>) => ({
-    id: w.id as string,
-    status: w.status as string,
-    progress_percentage: w.progress_percentage as number | null,
-    started_at: w.started_at as string | null,
-    completed_at: w.completed_at as string | null,
-    wizards: Array.isArray(w.wizards) ? w.wizards[0] : w.wizards as WizardInstanceRaw['wizards'],
-  }))
+  // Fetch wizard instances separately
+  const { data: wizardInstancesRaw } = await supabase
+    .from('wizard_instances')
+    .select(`
+      id,
+      status,
+      progress_percentage,
+      started_at,
+      completed_at,
+      wizard_id
+    `)
+    .eq('project_id', projectId)
+
+  // Fetch wizard definitions for names
+  const wizardIds = (wizardInstancesRaw ?? []).map(w => w.wizard_id).filter(Boolean)
+  const { data: wizardDefs } = wizardIds.length > 0 
+    ? await supabase.from('wizards').select('id, name, description').in('id', wizardIds)
+    : { data: [] }
+
+  // Combine the data
+  const wizards: WizardInstanceRaw[] = (wizardInstancesRaw ?? []).map((w) => {
+    const wizardDef = (wizardDefs ?? []).find(d => d.id === w.wizard_id)
+    return {
+      id: w.id,
+      status: w.status,
+      progress_percentage: w.progress_percentage,
+      started_at: w.started_at,
+      completed_at: w.completed_at,
+      wizards: wizardDef ? { id: wizardDef.id, name: wizardDef.name, description: wizardDef.description } : null,
+    }
+  })
   
   const totalWizards = wizards.length
   const completedWizards = wizards.filter((w) => w.status === 'completed').length

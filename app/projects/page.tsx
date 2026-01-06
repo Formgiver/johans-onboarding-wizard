@@ -48,38 +48,33 @@ export default async function ProjectsPage() {
     redirect('/login')
   }
 
-  // Fetch projects with wizard instance counts for progress
-  const { data: projects, error } = await supabase
+  // Fetch projects (simple query without join - FK not set up yet)
+  const { data: projects, error: projectsError } = await supabase
     .from('projects')
-    .select(`
-      id,
-      name,
-      status,
-      created_at,
-      wizard_instances (
-        id,
-        status,
-        progress_percentage
-      )
-    `)
+    .select('id, name, status, created_at')
     .order('created_at', { ascending: false })
 
-  if (error) {
+  // Fetch wizard instances separately
+  const { data: allWizardInstances } = await supabase
+    .from('wizard_instances')
+    .select('id, project_id, status, progress_percentage')
+
+  if (projectsError) {
     return (
       <AppShell 
         user={{ email: user.email ?? '' }}
         breadcrumbs={[{ name: 'Projects' }]}
       >
-        <div className="rounded-lg bg-red-50 p-4">
-          <p className="text-sm text-red-800">Error loading projects: {error.message}</p>
+        <div className="rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
+          <p className="text-sm text-red-800 dark:text-red-200">Error loading projects: {projectsError.message}</p>
         </div>
       </AppShell>
     )
   }
 
-  // Calculate progress metrics for each project
+  // Calculate progress metrics for each project by matching wizard_instances
   const projectsWithProgress: ProjectWithProgress[] = (projects ?? []).map((project) => {
-    const wizards = project.wizard_instances ?? []
+    const wizards = (allWizardInstances ?? []).filter((w) => w.project_id === project.id)
     const totalWizards = wizards.length
     const completedWizards = wizards.filter((w: WizardInstance) => w.status === 'completed').length
     const avgProgress = totalWizards > 0

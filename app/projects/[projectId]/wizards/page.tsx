@@ -70,24 +70,18 @@ export default async function WizardsPage({
     notFound()
   }
 
-  // Fetch wizard instances
+  // Fetch wizard instances (simple query without nested join)
   const { data: instances, error } = await supabase
     .from('wizard_instances')
-    .select(`
-      id,
-      status,
-      progress_percentage,
-      started_at,
-      completed_at,
-      created_at,
-      wizards (
-        id,
-        name,
-        description
-      )
-    `)
+    .select('id, status, progress_percentage, started_at, completed_at, created_at, wizard_id')
     .eq('project_id', projectId)
     .order('created_at', { ascending: false })
+
+  // Fetch wizard definitions for names
+  const wizardIds = (instances ?? []).map(w => w.wizard_id).filter(Boolean)
+  const { data: wizardDefs } = wizardIds.length > 0
+    ? await supabase.from('wizards').select('id, name, description').in('id', wizardIds)
+    : { data: [] }
 
   if (error) {
     return (
@@ -99,8 +93,8 @@ export default async function WizardsPage({
           { name: 'Wizards' },
         ]}
       >
-        <div className="rounded-lg bg-red-50 p-4">
-          <p className="text-sm text-red-800">Error loading wizards: {error.message}</p>
+        <div className="rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
+          <p className="text-sm text-red-800 dark:text-red-200">Error loading wizards: {error.message}</p>
         </div>
       </AppShell>
     )
@@ -108,15 +102,18 @@ export default async function WizardsPage({
 
   // Transform and sort instances
   const rawInstances = instances ?? []
-  const transformedInstances: WizardInstance[] = rawInstances.map((w: Record<string, unknown>) => ({
-    id: w.id as string,
-    status: w.status as string,
-    progress_percentage: w.progress_percentage as number | null,
-    started_at: w.started_at as string | null,
-    completed_at: w.completed_at as string | null,
-    created_at: w.created_at as string,
-    wizards: Array.isArray(w.wizards) ? w.wizards[0] : w.wizards as WizardInstance['wizards'],
-  }))
+  const transformedInstances: WizardInstance[] = rawInstances.map((w) => {
+    const wizardDef = (wizardDefs ?? []).find(d => d.id === w.wizard_id)
+    return {
+      id: w.id,
+      status: w.status,
+      progress_percentage: w.progress_percentage,
+      started_at: w.started_at,
+      completed_at: w.completed_at,
+      created_at: w.created_at,
+      wizards: wizardDef ? { id: wizardDef.id, name: wizardDef.name, description: wizardDef.description } : null,
+    }
+  })
 
   // Sort by status priority
   const sortedInstances = [...transformedInstances].sort((a, b) => {
