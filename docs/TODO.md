@@ -19,6 +19,7 @@
 ## Wizard engine
 
 - [x] Wizard engine – data model (wizards, wizard_steps, wizard_instances, wizard_step_inputs)
+- [x] Wizard UI (Step F) – project detail, wizard instances list, wizard instance detail with editable inputs
 - [ ] Author minimal interpreter spec for `WizardDefinition` (steps, conditions, validations).
 - [ ] Define process for authoring and reviewing wizard data (who may edit definitions).
 - [ ] Create test fixtures for common wizard flows and country profiles.
