@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { ChevronRightIcon, ArrowLeftIcon } from '@heroicons/react/24/outline'
-import { StatusBadge } from '@/components/ui'
+import { ChevronRightIcon, ArrowLeftIcon, LockClosedIcon, RocketLaunchIcon, ChartBarIcon } from '@heroicons/react/24/outline'
+import { StatusBadge, Header, Footer } from '@/components/ui'
 
 export default async function ProjectsPage() {
   const supabase = await createClient()
@@ -12,21 +12,73 @@ export default async function ProjectsPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gray-50 px-6 py-24 sm:py-32 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <h1 className="text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">Projects</h1>
-          <p className="mt-6 text-lg/8 text-gray-600">
-            You must be logged in to view projects.
-          </p>
-          <div className="mt-10">
-            <Link
-              href="/login"
-              className="rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-            >
-              Go to login
-            </Link>
+      <div className="bg-white">
+        <Header />
+        
+        <div className="relative isolate px-6 pt-14 lg:px-8">
+          <div className="mx-auto max-w-2xl py-32 sm:py-48">
+            <div className="text-center">
+              <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-indigo-100 mb-6">
+                <LockClosedIcon className="size-8 text-indigo-600" />
+              </div>
+              <h1 className="text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">
+                Projects
+              </h1>
+              <p className="mt-6 text-lg/8 text-gray-600">
+                Sign in to access your onboarding projects and wizards.
+              </p>
+              <div className="mt-10 flex items-center justify-center gap-x-6">
+                <Link
+                  href="/login"
+                  className="rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                >
+                  Sign in to continue
+                </Link>
+                <Link href="/" className="text-sm/6 font-semibold text-gray-900">
+                  Back to home <span aria-hidden="true">→</span>
+                </Link>
+              </div>
+
+              {/* Feature preview */}
+              <div className="mt-16 border-t border-gray-200 pt-16">
+                <h2 className="text-base/7 font-semibold text-indigo-600 mb-8">What you get with Projects</h2>
+                <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
+                  <div>
+                    <div className="mx-auto flex size-12 items-center justify-center rounded-lg bg-indigo-50">
+                      <RocketLaunchIcon className="size-6 text-indigo-600" />
+                    </div>
+                    <h3 className="mt-4 text-sm font-semibold text-gray-900">Manage Projects</h3>
+                    <p className="mt-2 text-sm text-gray-600">
+                      Track all your onboarding projects in one place
+                    </p>
+                  </div>
+                  <div>
+                    <div className="mx-auto flex size-12 items-center justify-center rounded-lg bg-indigo-50">
+                      <ChartBarIcon className="size-6 text-indigo-600" />
+                    </div>
+                    <h3 className="mt-4 text-sm font-semibold text-gray-900">Track Progress</h3>
+                    <p className="mt-2 text-sm text-gray-600">
+                      Real-time progress tracking for all wizards
+                    </p>
+                  </div>
+                  <div>
+                    <div className="mx-auto flex size-12 items-center justify-center rounded-lg bg-indigo-50">
+                      <svg className="size-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
+                    <h3 className="mt-4 text-sm font-semibold text-gray-900">Generate Summaries</h3>
+                    <p className="mt-2 text-sm text-gray-600">
+                      Automated customer and PM summaries
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+
+        <Footer />
       </div>
     )
   }
